@@ -4,35 +4,30 @@ import prisma from "@/lib/prisma";
 import { getUserPermissions } from "@/lib/permissions";
 import type { Permissions } from "@/config/permissions";
 import {
-  mockSites,
-  getSiteById,
-  getSitesSummary,
-  mockCampaigns,
-  getCampaignsBySiteId,
-  getCampaignById,
-  mockCreatives,
-  getCreativesBySiteId,
-  getCreativesByCampaignId,
-  getAdsSummary,
-  mockSEOAnalyses,
-  getSEOAnalysisBySiteId,
-  getSEOSummary,
-  mockProducts,
-  getProductsBySiteId,
-  getProductById,
-  getProductsSummary,
-  getAnalyticsSummary,
-  getAnalyticsForSite,
-} from "@/lib/mock-data";
-import type {
-  Site,
-  Campaign,
-  Creative,
-  SEOAnalysis,
-  ProductListing,
-  AnalyticsSummary,
-  AnalyticsSnapshot,
-} from "@/lib/mock-data/types";
+  getAdPlatformConnections as getAdPlatformConnectionsFromDb,
+  getAdsDashboardData as getAdsDashboardDataFromDb,
+  getAnalyticsDashboardData as getAnalyticsDashboardDataFromDb,
+  getCampaign as getCampaignFromDb,
+  getCampaigns as getCampaignsFromDb,
+  getCampaignsForSite as getCampaignsForSiteFromDb,
+  getCreative as getCreativeFromDb,
+  getCreatives as getCreativesFromDb,
+  getCreativesForCampaign as getCreativesForCampaignFromDb,
+  getCreativesForSite as getCreativesForSiteFromDb,
+  getEmailAutomation as getEmailAutomationFromDb,
+  getEmailAutomations as getEmailAutomationsFromDb,
+  getProductListing as getProductListingFromDb,
+  getProductListings as getProductListingsFromDb,
+  getProductsDashboardData as getProductsDashboardDataFromDb,
+  getProductsForSite as getProductsForSiteFromDb,
+  getSEOAnalyses as getSEOAnalysesFromDb,
+  getSEOAnalysisForSite as getSEOAnalysisForSiteFromDb,
+  getSEODashboardData as getSEODashboardDataFromDb,
+  getSite as getSiteFromDb,
+  getSiteAnalytics as getSiteAnalyticsFromDb,
+  getSites as getSitesFromDb,
+  getSitesDashboardData as getSitesDashboardDataFromDb,
+} from "@/lib/ecommerce-fetchers";
 
 // ============================================
 // PROJECTS
@@ -40,7 +35,9 @@ import type {
 
 export async function getProjects() {
   try {
-    const projects = await prisma.project.findMany({
+    // Sites are the canonical workspaces; expose them through the
+    // existing "projects" fetcher contract for task/user flows.
+    const sites = await prisma.site.findMany({
       select: {
         id: true,
         name: true,
@@ -48,14 +45,32 @@ export async function getProjects() {
         status: true,
         createdAt: true,
         updatedAt: true,
-        _count: {
-          select: {
-            tasks: true,
-            members: true,
-          },
-        },
       },
       orderBy: { createdAt: "desc" },
+    });
+
+    const taskCounts = await prisma.task.groupBy({
+      by: ["projectId"],
+      _count: { _all: true },
+      where: {
+        projectId: { in: sites.map((site) => site.id) },
+      },
+    });
+
+    const taskCountMap = new Map(taskCounts.map((row) => [row.projectId, row._count._all]));
+
+    const projects = sites.map((site) => {
+      const normalizedStatus: "ACTIVE" | "ARCHIVED" =
+        site.status === "ACTIVE" ? "ACTIVE" : "ARCHIVED";
+
+      return {
+        ...site,
+        status: normalizedStatus,
+        _count: {
+          tasks: taskCountMap.get(site.id) ?? 0,
+          members: 0,
+        },
+      };
     });
 
     return { data: projects, error: null };
@@ -67,35 +82,38 @@ export async function getProjects() {
 
 export async function getProject(id: string) {
   try {
-    const project = await prisma.project.findUnique({
+    const site = await prisma.site.findUnique({
       where: { id },
-      include: {
-        members: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                role: true,
-              },
-            },
-          },
-        },
-        _count: {
-          select: {
-            tasks: true,
-          },
-        },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
-    if (!project) {
+    if (!site) {
       return { data: null, error: "Project not found" };
     }
 
-    return { data: project, error: null };
+    const taskCount = await prisma.task.count({
+      where: { projectId: id },
+    });
+
+    const normalizedStatus: "ACTIVE" | "ARCHIVED" =
+      site.status === "ACTIVE" ? "ACTIVE" : "ARCHIVED";
+
+    return {
+      data: {
+        ...site,
+        status: normalizedStatus,
+        members: [],
+        _count: { tasks: taskCount },
+      },
+      error: null,
+    };
   } catch (error) {
     console.error("Error fetching project:", error);
     return { data: null, error: "Failed to fetch project" };
@@ -397,322 +415,97 @@ export async function fetchUserPermissions(userId: string): Promise<{
 }
 
 // ============================================
-// SITES (Mock Data)
+// E-COMMERCE DATA
 // ============================================
 
-export async function getSites(): Promise<{
-  data: Site[] | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Sites] Fetching all sites...");
-    return { data: mockSites, error: null };
-  } catch (error) {
-    console.error("Error fetching sites:", error);
-    return { data: null, error: "Failed to fetch sites" };
-  }
+export async function getSites() {
+  return getSitesFromDb();
 }
 
-export async function getSite(id: string): Promise<{
-  data: Site | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Sites] Fetching site:", id);
-    const site = getSiteById(id);
-    if (!site) {
-      return { data: null, error: "Site not found" };
-    }
-    return { data: site, error: null };
-  } catch (error) {
-    console.error("Error fetching site:", error);
-    return { data: null, error: "Failed to fetch site" };
-  }
+export async function getSite(id: string) {
+  return getSiteFromDb(id);
 }
 
-export async function getSitesDashboardData(): Promise<{
-  data: {
-    sites: Site[];
-    summary: ReturnType<typeof getSitesSummary>;
-  } | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Sites] Fetching sites dashboard data...");
-    return {
-      data: {
-        sites: mockSites,
-        summary: getSitesSummary(),
-      },
-      error: null,
-    };
-  } catch (error) {
-    console.error("Error fetching sites dashboard:", error);
-    return { data: null, error: "Failed to fetch sites dashboard" };
-  }
+export async function getSitesDashboardData() {
+  return getSitesDashboardDataFromDb();
 }
 
-// ============================================
-// ADS & CAMPAIGNS (Mock Data)
-// ============================================
-
-export async function getCampaigns(): Promise<{
-  data: Campaign[] | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Ads] Fetching all campaigns...");
-    return { data: mockCampaigns, error: null };
-  } catch (error) {
-    console.error("Error fetching campaigns:", error);
-    return { data: null, error: "Failed to fetch campaigns" };
-  }
+export async function getCampaigns() {
+  return getCampaignsFromDb();
 }
 
-export async function getCampaign(id: string): Promise<{
-  data: Campaign | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Ads] Fetching campaign:", id);
-    const campaign = getCampaignById(id);
-    if (!campaign) {
-      return { data: null, error: "Campaign not found" };
-    }
-    return { data: campaign, error: null };
-  } catch (error) {
-    console.error("Error fetching campaign:", error);
-    return { data: null, error: "Failed to fetch campaign" };
-  }
+export async function getCampaign(id: string) {
+  return getCampaignFromDb(id);
 }
 
-export async function getCampaignsForSite(siteId: string): Promise<{
-  data: Campaign[] | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Ads] Fetching campaigns for site:", siteId);
-    return { data: getCampaignsBySiteId(siteId), error: null };
-  } catch (error) {
-    console.error("Error fetching site campaigns:", error);
-    return { data: null, error: "Failed to fetch campaigns" };
-  }
+export async function getCampaignsForSite(siteId: string) {
+  return getCampaignsForSiteFromDb(siteId);
 }
 
-export async function getCreatives(): Promise<{
-  data: Creative[] | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Ads] Fetching all creatives...");
-    return { data: mockCreatives, error: null };
-  } catch (error) {
-    console.error("Error fetching creatives:", error);
-    return { data: null, error: "Failed to fetch creatives" };
-  }
+export async function getCreatives() {
+  return getCreativesFromDb();
 }
 
-export async function getCreativesForSite(siteId: string): Promise<{
-  data: Creative[] | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Ads] Fetching creatives for site:", siteId);
-    return { data: getCreativesBySiteId(siteId), error: null };
-  } catch (error) {
-    console.error("Error fetching site creatives:", error);
-    return { data: null, error: "Failed to fetch creatives" };
-  }
+export async function getCreativesForSite(siteId: string) {
+  return getCreativesForSiteFromDb(siteId);
 }
 
-export async function getCreativesForCampaign(campaignId: string): Promise<{
-  data: Creative[] | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Ads] Fetching creatives for campaign:", campaignId);
-    return { data: getCreativesByCampaignId(campaignId), error: null };
-  } catch (error) {
-    console.error("Error fetching campaign creatives:", error);
-    return { data: null, error: "Failed to fetch creatives" };
-  }
+export async function getCreativesForCampaign(campaignId: string) {
+  return getCreativesForCampaignFromDb(campaignId);
 }
 
-export async function getAdsDashboardData(): Promise<{
-  data: {
-    campaigns: Campaign[];
-    creatives: Creative[];
-    summary: ReturnType<typeof getAdsSummary>;
-  } | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Ads] Fetching ads dashboard data...");
-    return {
-      data: {
-        campaigns: mockCampaigns,
-        creatives: mockCreatives,
-        summary: getAdsSummary(),
-      },
-      error: null,
-    };
-  } catch (error) {
-    console.error("Error fetching ads dashboard:", error);
-    return { data: null, error: "Failed to fetch ads dashboard" };
-  }
+export async function getCreative(id: string) {
+  return getCreativeFromDb(id);
 }
 
-// ============================================
-// SEO (Mock Data)
-// ============================================
-
-export async function getSEOAnalyses(): Promise<{
-  data: SEOAnalysis[] | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[SEO] Fetching all SEO analyses...");
-    return { data: mockSEOAnalyses, error: null };
-  } catch (error) {
-    console.error("Error fetching SEO analyses:", error);
-    return { data: null, error: "Failed to fetch SEO analyses" };
-  }
+export async function getAdsDashboardData() {
+  return getAdsDashboardDataFromDb();
 }
 
-export async function getSEOAnalysisForSite(siteId: string): Promise<{
-  data: SEOAnalysis | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[SEO] Fetching SEO analysis for site:", siteId);
-    const analysis = getSEOAnalysisBySiteId(siteId);
-    if (!analysis) {
-      return { data: null, error: "SEO analysis not found for this site" };
-    }
-    return { data: analysis, error: null };
-  } catch (error) {
-    console.error("Error fetching site SEO analysis:", error);
-    return { data: null, error: "Failed to fetch SEO analysis" };
-  }
+export async function getAdPlatformConnections() {
+  return getAdPlatformConnectionsFromDb();
 }
 
-export async function getSEODashboardData(): Promise<{
-  data: {
-    analyses: SEOAnalysis[];
-    summary: ReturnType<typeof getSEOSummary>;
-  } | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[SEO] Fetching SEO dashboard data...");
-    return {
-      data: {
-        analyses: mockSEOAnalyses,
-        summary: getSEOSummary(),
-      },
-      error: null,
-    };
-  } catch (error) {
-    console.error("Error fetching SEO dashboard:", error);
-    return { data: null, error: "Failed to fetch SEO dashboard" };
-  }
+export async function getSEOAnalyses() {
+  return getSEOAnalysesFromDb();
 }
 
-// ============================================
-// PRODUCTS (Mock Data)
-// ============================================
-
-export async function getProductListings(): Promise<{
-  data: ProductListing[] | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Products] Fetching all product listings...");
-    return { data: mockProducts, error: null };
-  } catch (error) {
-    console.error("Error fetching products:", error);
-    return { data: null, error: "Failed to fetch products" };
-  }
+export async function getSEOAnalysisForSite(siteId: string) {
+  return getSEOAnalysisForSiteFromDb(siteId);
 }
 
-export async function getProductListing(id: string): Promise<{
-  data: ProductListing | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Products] Fetching product:", id);
-    const product = getProductById(id);
-    if (!product) {
-      return { data: null, error: "Product not found" };
-    }
-    return { data: product, error: null };
-  } catch (error) {
-    console.error("Error fetching product:", error);
-    return { data: null, error: "Failed to fetch product" };
-  }
+export async function getSEODashboardData() {
+  return getSEODashboardDataFromDb();
 }
 
-export async function getProductsForSite(siteId: string): Promise<{
-  data: ProductListing[] | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Products] Fetching products for site:", siteId);
-    return { data: getProductsBySiteId(siteId), error: null };
-  } catch (error) {
-    console.error("Error fetching site products:", error);
-    return { data: null, error: "Failed to fetch products" };
-  }
+export async function getProductListings() {
+  return getProductListingsFromDb();
 }
 
-export async function getProductsDashboardData(): Promise<{
-  data: {
-    products: ProductListing[];
-    summary: ReturnType<typeof getProductsSummary>;
-  } | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Products] Fetching products dashboard data...");
-    return {
-      data: {
-        products: mockProducts,
-        summary: getProductsSummary(),
-      },
-      error: null,
-    };
-  } catch (error) {
-    console.error("Error fetching products dashboard:", error);
-    return { data: null, error: "Failed to fetch products dashboard" };
-  }
+export async function getProductListing(id: string) {
+  return getProductListingFromDb(id);
 }
 
-// ============================================
-// ANALYTICS (Mock Data)
-// ============================================
-
-export async function getAnalyticsDashboardData(days: number = 30): Promise<{
-  data: AnalyticsSummary | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Analytics] Fetching analytics dashboard data for", days, "days...");
-    return { data: getAnalyticsSummary(days), error: null };
-  } catch (error) {
-    console.error("Error fetching analytics dashboard:", error);
-    return { data: null, error: "Failed to fetch analytics" };
-  }
+export async function getProductsForSite(siteId: string) {
+  return getProductsForSiteFromDb(siteId);
 }
 
-export async function getSiteAnalytics(siteId: string, days: number = 30): Promise<{
-  data: AnalyticsSnapshot[] | null;
-  error: string | null;
-}> {
-  try {
-    console.log("[Analytics] Fetching analytics for site:", siteId);
-    return { data: getAnalyticsForSite(siteId, days), error: null };
-  } catch (error) {
-    console.error("Error fetching site analytics:", error);
-    return { data: null, error: "Failed to fetch site analytics" };
-  }
+export async function getProductsDashboardData() {
+  return getProductsDashboardDataFromDb();
+}
+
+export async function getAnalyticsDashboardData(days: number = 30) {
+  return getAnalyticsDashboardDataFromDb(days);
+}
+
+export async function getSiteAnalytics(siteId: string, days: number = 30) {
+  return getSiteAnalyticsFromDb(siteId, days);
+}
+
+export async function getEmailAutomations() {
+  return getEmailAutomationsFromDb();
+}
+
+export async function getEmailAutomation(id: string) {
+  return getEmailAutomationFromDb(id);
 }

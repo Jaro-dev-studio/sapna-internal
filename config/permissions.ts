@@ -10,6 +10,7 @@ export const PERMISSION_RESOURCES = [
   { key: "ads", label: "Ads" },
   { key: "products", label: "Products" },
   { key: "analytics", label: "Analytics" },
+  { key: "emailAutomation", label: "Email Automation" },
 ] as const;
 
 export const PERMISSION_PAGES = [
@@ -26,6 +27,7 @@ export const PERMISSION_PAGES = [
   { key: "ads", label: "Ads", path: "/dashboard/ads" },
   { key: "products", label: "Products", path: "/dashboard/products" },
   { key: "analytics", label: "Analytics", path: "/dashboard/analytics" },
+  { key: "emailAutomation", label: "Email Automation", path: "/dashboard/email-automation" },
 ] as const;
 
 export const PERMISSION_FEATURES = [
@@ -95,6 +97,7 @@ export const DEFAULT_MEMBER_PERMISSIONS: Permissions = {
     ads: { create: false, read: true, update: false, delete: false },
     products: { create: false, read: true, update: false, delete: false },
     analytics: { create: false, read: true, update: false, delete: false },
+    emailAutomation: { create: true, read: true, update: true, delete: false },
   },
   pages: {
     projects: false,
@@ -110,6 +113,7 @@ export const DEFAULT_MEMBER_PERMISSIONS: Permissions = {
     ads: true,
     products: true,
     analytics: true,
+    emailAutomation: true,
   },
   features: {
     aiChat: true,
@@ -129,6 +133,7 @@ export const DEFAULT_VIEWER_PERMISSIONS: Permissions = {
     ads: { create: false, read: true, update: false, delete: false },
     products: { create: false, read: true, update: false, delete: false },
     analytics: { create: false, read: true, update: false, delete: false },
+    emailAutomation: { create: false, read: true, update: false, delete: false },
   },
   pages: {
     projects: false,
@@ -144,6 +149,7 @@ export const DEFAULT_VIEWER_PERMISSIONS: Permissions = {
     ads: true,
     products: true,
     analytics: true,
+    emailAutomation: true,
   },
   features: {
     aiChat: false,

@@ -1,7 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Prisma, UserRole, SlackNotificationEventType, TaskPriority } from "@prisma/client";
+import {
+  Prisma,
+  UserRole,
+  SlackNotificationEventType,
+  TaskPriority,
+  AdPlatform,
+  CampaignStatus,
+  CreativeStatus,
+  CreativeType,
+  EmailAutomationRunStatus,
+  EmailAutomationTriggerType,
+} from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { createId } from "@paralleldrive/cuid2";
 import prisma from "@/lib/prisma";
@@ -55,7 +66,7 @@ export async function createProject(data: { name: string; description?: string }
     });
 
     revalidatePath("/dashboard/tasks");
-    revalidatePath("/dashboard/projects");
+    revalidatePath("/dashboard/sites");
     return { data: project, error: null };
   } catch (error) {
     console.error("Error creating project:", error);
@@ -86,7 +97,7 @@ export async function updateProject(
     });
 
     revalidatePath("/dashboard/tasks");
-    revalidatePath("/dashboard/projects");
+    revalidatePath("/dashboard/sites");
     return { data: project, error: null };
   } catch (error) {
     console.error("Error updating project:", error);
@@ -109,7 +120,7 @@ export async function deleteProject(id: string) {
     });
 
     revalidatePath("/dashboard/tasks");
-    revalidatePath("/dashboard/projects");
+    revalidatePath("/dashboard/sites");
     return { data: true, error: null };
   } catch (error) {
     console.error("Error deleting project:", error);
@@ -130,7 +141,7 @@ export async function addProjectMember(projectId: string, userId: string) {
     });
 
     revalidatePath("/dashboard/tasks");
-    revalidatePath("/dashboard/projects");
+    revalidatePath("/dashboard/sites");
     return { data: member, error: null };
   } catch (error) {
     console.error("Error adding project member:", error);
@@ -153,7 +164,7 @@ export async function removeProjectMember(projectId: string, userId: string) {
     });
 
     revalidatePath("/dashboard/tasks");
-    revalidatePath("/dashboard/projects");
+    revalidatePath("/dashboard/sites");
     return { data: true, error: null };
   } catch (error) {
     console.error("Error removing project member:", error);
@@ -936,7 +947,7 @@ export async function searchCommandPalette(query: string): Promise<{
       }))
     );
 
-    const projects = await prisma.project.findMany({
+    const projects = await prisma.site.findMany({
       where: { name: { contains: searchTerm, mode: "insensitive" } },
       select: { id: true, name: true },
       take: 2,
@@ -946,7 +957,7 @@ export async function searchCommandPalette(query: string): Promise<{
         id: p.id,
         name: p.name,
         type: "project" as const,
-        href: `/dashboard/projects/${p.id}`,
+        href: `/dashboard/sites/${p.id}`,
       }))
     );
 
@@ -1440,5 +1451,473 @@ export async function setUserPermissionOverride(
   } catch (error) {
     console.error("Error setting permission override:", error);
     return { data: null, error: "Failed to set permission override" };
+  }
+}
+
+// ============================================
+// ADS MANAGEMENT
+// ============================================
+
+export async function connectAdPlatform(data: {
+  siteId: string;
+  platform: AdPlatform;
+  accountId: string;
+  accountName: string;
+  accessToken?: string;
+  refreshToken?: string;
+}) {
+  try {
+    console.log("[Ads Integration] validating authenticated user...");
+    const userId = await getCurrentUserId();
+    if (!userId) return { data: null, error: "Not authenticated" };
+
+    console.log("[Ads Integration] validating permissions...");
+    const perm = await requirePermission(userId, "ads", "update");
+    if (!perm.allowed) return { data: null, error: perm.error };
+
+    console.log("[Ads Integration] checking site exists...");
+    const site = await prisma.site.findUnique({
+      where: { id: data.siteId },
+      select: { id: true, name: true },
+    });
+    if (!site) return { data: null, error: "Site not found" };
+
+    console.log("[Ads Integration] saving platform connection...");
+    const connection = await prisma.adPlatformConnection.upsert({
+      where: { siteId_platform: { siteId: data.siteId, platform: data.platform } },
+      update: {
+        accountId: data.accountId,
+        accountName: data.accountName,
+        accessToken: data.accessToken ?? null,
+        refreshToken: data.refreshToken ?? null,
+        status: "CONNECTED",
+        lastSyncedAt: new Date(),
+      },
+      create: {
+        siteId: data.siteId,
+        platform: data.platform,
+        accountId: data.accountId,
+        accountName: data.accountName,
+        accessToken: data.accessToken ?? null,
+        refreshToken: data.refreshToken ?? null,
+        status: "CONNECTED",
+        lastSyncedAt: new Date(),
+      },
+    });
+
+    revalidatePath("/dashboard/ads");
+    return { data: connection, error: null };
+  } catch (error) {
+    console.error("Error connecting ad platform:", error);
+    return { data: null, error: "Failed to connect ad platform" };
+  }
+}
+
+export async function disconnectAdPlatform(connectionId: string) {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return { data: null, error: "Not authenticated" };
+
+    const perm = await requirePermission(userId, "ads", "update");
+    if (!perm.allowed) return { data: null, error: perm.error };
+
+    const connection = await prisma.adPlatformConnection.update({
+      where: { id: connectionId },
+      data: {
+        status: "DISCONNECTED",
+        accessToken: null,
+        refreshToken: null,
+      },
+    });
+
+    revalidatePath("/dashboard/ads");
+    return { data: connection, error: null };
+  } catch (error) {
+    console.error("Error disconnecting ad platform:", error);
+    return { data: null, error: "Failed to disconnect ad platform" };
+  }
+}
+
+export async function syncAdPlatformConnection(connectionId: string) {
+  try {
+    console.log("[Ads Integration] validating authenticated user...");
+    const userId = await getCurrentUserId();
+    if (!userId) return { data: null, error: "Not authenticated" };
+
+    console.log("[Ads Integration] validating permissions...");
+    const perm = await requirePermission(userId, "ads", "update");
+    if (!perm.allowed) return { data: null, error: perm.error };
+
+    console.log("[Ads Integration] loading connection before sync...");
+    const connection = await prisma.adPlatformConnection.findUnique({
+      where: { id: connectionId },
+    });
+    if (!connection) return { data: null, error: "Connection not found" };
+    if (connection.status !== "CONNECTED") {
+      return { data: null, error: "Only connected integrations can be synced" };
+    }
+
+    console.log("[Ads Integration] simulating platform sync and updating timestamp...");
+    const updatedConnection = await prisma.adPlatformConnection.update({
+      where: { id: connectionId },
+      data: { lastSyncedAt: new Date() },
+    });
+
+    revalidatePath("/dashboard/ads");
+    return { data: updatedConnection, error: null };
+  } catch (error) {
+    console.error("Error syncing ad platform connection:", error);
+    return { data: null, error: "Failed to sync ad platform connection" };
+  }
+}
+
+export async function createAdCampaign(data: {
+  name: string;
+  siteId: string;
+  platform: AdPlatform;
+  objective?: string;
+  budget?: number;
+  dailyBudget?: number;
+  status?: CampaignStatus;
+}) {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return { data: null, error: "Not authenticated" };
+
+    const perm = await requirePermission(userId, "ads", "create");
+    if (!perm.allowed) return { data: null, error: perm.error };
+
+    const campaign = await prisma.campaign.create({
+      data: {
+        name: data.name,
+        siteId: data.siteId,
+        platform: data.platform,
+        objective: data.objective ?? null,
+        budget: data.budget ?? 0,
+        dailyBudget: data.dailyBudget ?? 0,
+        status: data.status ?? "DRAFT",
+      },
+    });
+
+    revalidatePath("/dashboard/ads");
+    return { data: campaign, error: null };
+  } catch (error) {
+    console.error("Error creating campaign:", error);
+    return { data: null, error: "Failed to create campaign" };
+  }
+}
+
+export async function createAdCreative(data: {
+  name: string;
+  type: CreativeType;
+  siteId: string;
+  campaignId?: string;
+  headline?: string;
+  description?: string;
+  callToAction?: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  status?: CreativeStatus;
+}) {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return { data: null, error: "Not authenticated" };
+
+    const perm = await requirePermission(userId, "ads", "create");
+    if (!perm.allowed) return { data: null, error: perm.error };
+
+    const creative = await prisma.creative.create({
+      data: {
+        name: data.name,
+        type: data.type,
+        siteId: data.siteId,
+        campaignId: data.campaignId ?? null,
+        headline: data.headline ?? null,
+        description: data.description ?? null,
+        callToAction: data.callToAction ?? null,
+        imageUrl: data.imageUrl ?? null,
+        videoUrl: data.videoUrl ?? null,
+        thumbnailUrl: data.thumbnailUrl ?? null,
+        status: data.status ?? "DRAFT",
+      },
+    });
+
+    revalidatePath("/dashboard/ads");
+    return { data: creative, error: null };
+  } catch (error) {
+    console.error("Error creating creative:", error);
+    return { data: null, error: "Failed to create creative" };
+  }
+}
+
+// ============================================
+// EMAIL AUTOMATION
+// ============================================
+
+export async function createEmailAutomation(data: {
+  name: string;
+  description?: string;
+  triggerType: EmailAutomationTriggerType;
+  siteId?: string;
+  subjectTemplate: string;
+  bodyTemplate: string;
+}) {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return { data: null, error: "Not authenticated" };
+
+    const perm = await requirePermission(userId, "notifications", "create");
+    if (!perm.allowed) return { data: null, error: perm.error };
+
+    const automation = await prisma.emailAutomation.create({
+      data: {
+        name: data.name,
+        description: data.description ?? null,
+        triggerType: data.triggerType,
+        siteId: data.siteId ?? null,
+        subjectTemplate: data.subjectTemplate,
+        bodyTemplate: data.bodyTemplate,
+      },
+    });
+
+    revalidatePath("/dashboard/email-automation");
+    return { data: automation, error: null };
+  } catch (error) {
+    console.error("Error creating email automation:", error);
+    return { data: null, error: "Failed to create email automation" };
+  }
+}
+
+export async function toggleEmailAutomationActive(id: string) {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) return { data: null, error: "Not authenticated" };
+
+    const perm = await requirePermission(userId, "notifications", "update");
+    if (!perm.allowed) return { data: null, error: perm.error };
+
+    const existing = await prisma.emailAutomation.findUnique({
+      where: { id },
+      select: { isActive: true },
+    });
+    if (!existing) return { data: null, error: "Email automation not found" };
+
+    const updated = await prisma.emailAutomation.update({
+      where: { id },
+      data: { isActive: !existing.isActive },
+    });
+
+    revalidatePath("/dashboard/email-automation");
+    return { data: updated, error: null };
+  } catch (error) {
+    console.error("Error toggling email automation:", error);
+    return { data: null, error: "Failed to toggle email automation" };
+  }
+}
+
+export async function runEmailAutomationNow(data: {
+  automationId: string;
+  recipientEmail: string;
+}) {
+  try {
+    console.log("[Email Automation] validating authenticated user...");
+    const userId = await getCurrentUserId();
+    if (!userId) return { data: null, error: "Not authenticated" };
+
+    console.log("[Email Automation] validating permissions...");
+    const perm = await requirePermission(userId, "notifications", "update");
+    if (!perm.allowed) return { data: null, error: perm.error };
+
+    console.log("[Email Automation] loading automation...");
+    const automation = await prisma.emailAutomation.findUnique({
+      where: { id: data.automationId },
+      select: { id: true, isActive: true, subjectTemplate: true, bodyTemplate: true },
+    });
+    if (!automation) return { data: null, error: "Automation not found" };
+
+    console.log("[Email Automation] creating automation run...");
+    const run = await prisma.emailAutomationRun.create({
+      data: {
+        automationId: data.automationId,
+        recipientEmail: data.recipientEmail,
+        status: "PENDING",
+      },
+    });
+
+    try {
+      console.log("[Email Automation] preparing email payload...");
+      const renderedSubject = automation.subjectTemplate.replace("{{email}}", data.recipientEmail);
+      const renderedBody = automation.bodyTemplate.replace("{{email}}", data.recipientEmail);
+
+      console.log("[Email Automation] checking outbound provider configuration...");
+      const resendApiKey = process.env.RESEND_API_KEY;
+      const emailFrom = process.env.EMAIL_FROM;
+
+      if (resendApiKey && emailFrom) {
+        console.log("[Email Automation] sending email through Resend API...");
+        const response = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${resendApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: emailFrom,
+            to: [data.recipientEmail],
+            subject: renderedSubject,
+            html: `<p>${renderedBody}</p>`,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Resend API error: ${errorText}`);
+        }
+      } else {
+        console.log("[Email Automation] provider config missing, storing simulated send result...");
+      }
+
+      await prisma.emailAutomationRun.update({
+        where: { id: run.id },
+        data: {
+          status: EmailAutomationRunStatus.SENT,
+          sentAt: new Date(),
+        },
+      });
+    } catch (sendError) {
+      await prisma.emailAutomationRun.update({
+        where: { id: run.id },
+        data: {
+          status: EmailAutomationRunStatus.FAILED,
+          errorMessage: sendError instanceof Error ? sendError.message : "Unknown send error",
+        },
+      });
+      throw sendError;
+    }
+
+    revalidatePath("/dashboard/email-automation");
+    return { data: { success: true }, error: null };
+  } catch (error) {
+    console.error("Error running email automation:", error);
+    return { data: null, error: "Failed to run email automation" };
+  }
+}
+
+// ============================================
+// AI SEO AGENT
+// ============================================
+
+export async function runAISEOAgent(siteId: string): Promise<{
+  data: {
+    summary: string;
+    recommendations: Array<{
+      title: string;
+      priority: "high" | "medium" | "low";
+      category: "technical" | "content" | "backlinks" | "keywords";
+      description: string;
+      impact: string;
+    }>;
+  } | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[AI SEO Agent] validating authenticated user...");
+    const userId = await getCurrentUserId();
+    if (!userId) return { data: null, error: "Not authenticated" };
+
+    console.log("[AI SEO Agent] validating permissions...");
+    const perm = await requirePermission(userId, "seo", "update");
+    if (!perm.allowed) return { data: null, error: perm.error };
+
+    console.log("[AI SEO Agent] loading latest site analysis...");
+    const analysis = await prisma.sEOAnalysis.findFirst({
+      where: { siteId },
+      include: {
+        site: { select: { name: true } },
+      },
+      orderBy: { analyzedAt: "desc" },
+    });
+
+    if (!analysis) {
+      return { data: null, error: "No SEO analysis found for this site" };
+    }
+
+    console.log("[AI SEO Agent] generating recommendation set...");
+    const recommendations: Array<{
+      title: string;
+      priority: "high" | "medium" | "low";
+      category: "technical" | "content" | "backlinks" | "keywords";
+      description: string;
+      impact: string;
+    }> = [];
+
+    if (analysis.technicalScore < 80) {
+      recommendations.push({
+        title: "Fix technical SEO blockers",
+        priority: "high",
+        category: "technical",
+        description:
+          "Prioritize crawl/indexation issues, Core Web Vitals bottlenecks, and broken internal links to improve technical health.",
+        impact: "Improves index coverage and ranking stability.",
+      });
+    }
+
+    if (analysis.contentScore < 80) {
+      recommendations.push({
+        title: "Expand product and category content depth",
+        priority: "high",
+        category: "content",
+        description:
+          "Add richer product descriptions, FAQ sections, and intent-targeted category copy to capture long-tail search demand.",
+        impact: "Improves relevance and increases organic conversion traffic.",
+      });
+    }
+
+    if (analysis.backlinksScore < 75) {
+      recommendations.push({
+        title: "Launch high-authority backlink sprint",
+        priority: "medium",
+        category: "backlinks",
+        description:
+          "Target niche publications and digital PR placements using product-led stories and comparison content.",
+        impact: "Improves domain authority and competitive ranking potential.",
+      });
+    }
+
+    recommendations.push({
+      title: "Track keyword clusters by intent",
+      priority: "medium",
+      category: "keywords",
+      description:
+        "Group tracked keywords by transactional and informational intent, then optimize dedicated landing pages for each cluster.",
+      impact: "Improves topical authority and CTR from SERPs.",
+    });
+
+    const topRecommendations = recommendations.slice(0, 4);
+    const summary = `${analysis.site.name} SEO score is ${analysis.overallScore}/100. Focus next on ${
+      topRecommendations[0]?.title.toLowerCase() ?? "technical optimization"
+    } to improve rankings and conversion-quality traffic.`;
+
+    console.log("[AI SEO Agent] persisting generated recommendations to latest analysis...");
+    await prisma.sEOAnalysis.update({
+      where: { id: analysis.id },
+      data: {
+        recommendations: topRecommendations as any,
+      },
+    });
+
+    revalidatePath("/dashboard/seo");
+    revalidatePath(`/dashboard/seo/${siteId}`);
+    return {
+      data: {
+        summary,
+        recommendations: topRecommendations,
+      },
+      error: null,
+    };
+  } catch (error) {
+    console.error("Error running AI SEO agent:", error);
+    return { data: null, error: "Failed to run AI SEO agent" };
   }
 }

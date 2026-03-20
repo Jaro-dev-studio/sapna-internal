@@ -20,7 +20,7 @@ import {
   Repeat,
   Calculator,
   Plus,
-  FolderKanban,
+  Store,
   Shield,
 } from "lucide-react";
 import { searchCommandPalette, CommandPaletteResult } from "@/lib/actions";
@@ -36,7 +36,7 @@ interface NavigationItem {
 }
 
 const allNavigationItems: NavigationItem[] = [
-  { href: "/dashboard/projects", label: "Projects", icon: FolderKanban, section: "Work", pageKey: "projects" },
+  { href: "/dashboard/sites", label: "Sites", icon: Store, section: "Work", pageKey: "sites" },
   { href: "/dashboard/tasks", label: "Tasks", icon: ListTodo, section: "Work", pageKey: "tasks" },
   { href: "/dashboard/recurring-tasks", label: "Recurring Tasks", icon: Repeat, section: "Work", pageKey: "recurringTasks" },
   { href: "/dashboard/calculation", label: "Calculations", icon: Calculator, section: "Tools", pageKey: "calculations" },
@@ -48,13 +48,13 @@ const allNavigationItems: NavigationItem[] = [
 
 const typeIcons: Record<CommandPaletteResult["type"], React.ElementType> = {
   task: ListTodo,
-  project: FolderKanban,
+  project: Store,
   user: Users,
 };
 
 const typeLabels: Record<CommandPaletteResult["type"], string> = {
   task: "Task",
-  project: "Project",
+  project: "Site",
   user: "User",
 };
 
@@ -134,7 +134,7 @@ export function CommandPalette({ permissions }: CommandPaletteProps) {
     <CommandDialog open={open} onOpenChange={handleOpenChange}>
       <Command shouldFilter={false}>
         <CommandInput
-          placeholder="Search tasks, projects, or navigate..."
+          placeholder="Search tasks, sites, or navigate..."
           value={search}
           onValueChange={setSearch}
         />

@@ -18,5 +18,5 @@ export default async function DashboardPage() {
     redirect("/");
   }
 
-  redirect("/dashboard/tasks");
+  redirect("/dashboard/sites");
 }
