@@ -473,7 +473,7 @@ export function ProjectDetailClient({
                       key={member.id}
                       className="group flex items-center gap-3 px-5 py-3"
                     >
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                      <div className="bg-primary/10 text-primary flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
                         {initials}
                       </div>
                       <div className="min-w-0 flex-1">

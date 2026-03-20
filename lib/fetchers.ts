@@ -3,6 +3,36 @@
 import prisma from "@/lib/prisma";
 import { getUserPermissions } from "@/lib/permissions";
 import type { Permissions } from "@/config/permissions";
+import {
+  mockSites,
+  getSiteById,
+  getSitesSummary,
+  mockCampaigns,
+  getCampaignsBySiteId,
+  getCampaignById,
+  mockCreatives,
+  getCreativesBySiteId,
+  getCreativesByCampaignId,
+  getAdsSummary,
+  mockSEOAnalyses,
+  getSEOAnalysisBySiteId,
+  getSEOSummary,
+  mockProducts,
+  getProductsBySiteId,
+  getProductById,
+  getProductsSummary,
+  getAnalyticsSummary,
+  getAnalyticsForSite,
+} from "@/lib/mock-data";
+import type {
+  Site,
+  Campaign,
+  Creative,
+  SEOAnalysis,
+  ProductListing,
+  AnalyticsSummary,
+  AnalyticsSnapshot,
+} from "@/lib/mock-data/types";
 
 // ============================================
 // PROJECTS
@@ -363,5 +393,326 @@ export async function fetchUserPermissions(userId: string): Promise<{
   } catch (error) {
     console.error("Error fetching user permissions:", error);
     return { data: null, error: "Failed to fetch permissions" };
+  }
+}
+
+// ============================================
+// SITES (Mock Data)
+// ============================================
+
+export async function getSites(): Promise<{
+  data: Site[] | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Sites] Fetching all sites...");
+    return { data: mockSites, error: null };
+  } catch (error) {
+    console.error("Error fetching sites:", error);
+    return { data: null, error: "Failed to fetch sites" };
+  }
+}
+
+export async function getSite(id: string): Promise<{
+  data: Site | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Sites] Fetching site:", id);
+    const site = getSiteById(id);
+    if (!site) {
+      return { data: null, error: "Site not found" };
+    }
+    return { data: site, error: null };
+  } catch (error) {
+    console.error("Error fetching site:", error);
+    return { data: null, error: "Failed to fetch site" };
+  }
+}
+
+export async function getSitesDashboardData(): Promise<{
+  data: {
+    sites: Site[];
+    summary: ReturnType<typeof getSitesSummary>;
+  } | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Sites] Fetching sites dashboard data...");
+    return {
+      data: {
+        sites: mockSites,
+        summary: getSitesSummary(),
+      },
+      error: null,
+    };
+  } catch (error) {
+    console.error("Error fetching sites dashboard:", error);
+    return { data: null, error: "Failed to fetch sites dashboard" };
+  }
+}
+
+// ============================================
+// ADS & CAMPAIGNS (Mock Data)
+// ============================================
+
+export async function getCampaigns(): Promise<{
+  data: Campaign[] | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Ads] Fetching all campaigns...");
+    return { data: mockCampaigns, error: null };
+  } catch (error) {
+    console.error("Error fetching campaigns:", error);
+    return { data: null, error: "Failed to fetch campaigns" };
+  }
+}
+
+export async function getCampaign(id: string): Promise<{
+  data: Campaign | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Ads] Fetching campaign:", id);
+    const campaign = getCampaignById(id);
+    if (!campaign) {
+      return { data: null, error: "Campaign not found" };
+    }
+    return { data: campaign, error: null };
+  } catch (error) {
+    console.error("Error fetching campaign:", error);
+    return { data: null, error: "Failed to fetch campaign" };
+  }
+}
+
+export async function getCampaignsForSite(siteId: string): Promise<{
+  data: Campaign[] | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Ads] Fetching campaigns for site:", siteId);
+    return { data: getCampaignsBySiteId(siteId), error: null };
+  } catch (error) {
+    console.error("Error fetching site campaigns:", error);
+    return { data: null, error: "Failed to fetch campaigns" };
+  }
+}
+
+export async function getCreatives(): Promise<{
+  data: Creative[] | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Ads] Fetching all creatives...");
+    return { data: mockCreatives, error: null };
+  } catch (error) {
+    console.error("Error fetching creatives:", error);
+    return { data: null, error: "Failed to fetch creatives" };
+  }
+}
+
+export async function getCreativesForSite(siteId: string): Promise<{
+  data: Creative[] | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Ads] Fetching creatives for site:", siteId);
+    return { data: getCreativesBySiteId(siteId), error: null };
+  } catch (error) {
+    console.error("Error fetching site creatives:", error);
+    return { data: null, error: "Failed to fetch creatives" };
+  }
+}
+
+export async function getCreativesForCampaign(campaignId: string): Promise<{
+  data: Creative[] | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Ads] Fetching creatives for campaign:", campaignId);
+    return { data: getCreativesByCampaignId(campaignId), error: null };
+  } catch (error) {
+    console.error("Error fetching campaign creatives:", error);
+    return { data: null, error: "Failed to fetch creatives" };
+  }
+}
+
+export async function getAdsDashboardData(): Promise<{
+  data: {
+    campaigns: Campaign[];
+    creatives: Creative[];
+    summary: ReturnType<typeof getAdsSummary>;
+  } | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Ads] Fetching ads dashboard data...");
+    return {
+      data: {
+        campaigns: mockCampaigns,
+        creatives: mockCreatives,
+        summary: getAdsSummary(),
+      },
+      error: null,
+    };
+  } catch (error) {
+    console.error("Error fetching ads dashboard:", error);
+    return { data: null, error: "Failed to fetch ads dashboard" };
+  }
+}
+
+// ============================================
+// SEO (Mock Data)
+// ============================================
+
+export async function getSEOAnalyses(): Promise<{
+  data: SEOAnalysis[] | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[SEO] Fetching all SEO analyses...");
+    return { data: mockSEOAnalyses, error: null };
+  } catch (error) {
+    console.error("Error fetching SEO analyses:", error);
+    return { data: null, error: "Failed to fetch SEO analyses" };
+  }
+}
+
+export async function getSEOAnalysisForSite(siteId: string): Promise<{
+  data: SEOAnalysis | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[SEO] Fetching SEO analysis for site:", siteId);
+    const analysis = getSEOAnalysisBySiteId(siteId);
+    if (!analysis) {
+      return { data: null, error: "SEO analysis not found for this site" };
+    }
+    return { data: analysis, error: null };
+  } catch (error) {
+    console.error("Error fetching site SEO analysis:", error);
+    return { data: null, error: "Failed to fetch SEO analysis" };
+  }
+}
+
+export async function getSEODashboardData(): Promise<{
+  data: {
+    analyses: SEOAnalysis[];
+    summary: ReturnType<typeof getSEOSummary>;
+  } | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[SEO] Fetching SEO dashboard data...");
+    return {
+      data: {
+        analyses: mockSEOAnalyses,
+        summary: getSEOSummary(),
+      },
+      error: null,
+    };
+  } catch (error) {
+    console.error("Error fetching SEO dashboard:", error);
+    return { data: null, error: "Failed to fetch SEO dashboard" };
+  }
+}
+
+// ============================================
+// PRODUCTS (Mock Data)
+// ============================================
+
+export async function getProductListings(): Promise<{
+  data: ProductListing[] | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Products] Fetching all product listings...");
+    return { data: mockProducts, error: null };
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    return { data: null, error: "Failed to fetch products" };
+  }
+}
+
+export async function getProductListing(id: string): Promise<{
+  data: ProductListing | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Products] Fetching product:", id);
+    const product = getProductById(id);
+    if (!product) {
+      return { data: null, error: "Product not found" };
+    }
+    return { data: product, error: null };
+  } catch (error) {
+    console.error("Error fetching product:", error);
+    return { data: null, error: "Failed to fetch product" };
+  }
+}
+
+export async function getProductsForSite(siteId: string): Promise<{
+  data: ProductListing[] | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Products] Fetching products for site:", siteId);
+    return { data: getProductsBySiteId(siteId), error: null };
+  } catch (error) {
+    console.error("Error fetching site products:", error);
+    return { data: null, error: "Failed to fetch products" };
+  }
+}
+
+export async function getProductsDashboardData(): Promise<{
+  data: {
+    products: ProductListing[];
+    summary: ReturnType<typeof getProductsSummary>;
+  } | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Products] Fetching products dashboard data...");
+    return {
+      data: {
+        products: mockProducts,
+        summary: getProductsSummary(),
+      },
+      error: null,
+    };
+  } catch (error) {
+    console.error("Error fetching products dashboard:", error);
+    return { data: null, error: "Failed to fetch products dashboard" };
+  }
+}
+
+// ============================================
+// ANALYTICS (Mock Data)
+// ============================================
+
+export async function getAnalyticsDashboardData(days: number = 30): Promise<{
+  data: AnalyticsSummary | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Analytics] Fetching analytics dashboard data for", days, "days...");
+    return { data: getAnalyticsSummary(days), error: null };
+  } catch (error) {
+    console.error("Error fetching analytics dashboard:", error);
+    return { data: null, error: "Failed to fetch analytics" };
+  }
+}
+
+export async function getSiteAnalytics(siteId: string, days: number = 30): Promise<{
+  data: AnalyticsSnapshot[] | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Analytics] Fetching analytics for site:", siteId);
+    return { data: getAnalyticsForSite(siteId, days), error: null };
+  } catch (error) {
+    console.error("Error fetching site analytics:", error);
+    return { data: null, error: "Failed to fetch site analytics" };
   }
 }

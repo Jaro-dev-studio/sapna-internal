@@ -16,6 +16,11 @@ import {
   Calculator,
   FolderKanban,
   Shield,
+  Store,
+  Search,
+  Megaphone,
+  Package,
+  BarChart3,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -48,6 +53,26 @@ interface NavSection {
 }
 
 const allNavigationSections: NavSection[] = [
+  {
+    title: "E-Commerce",
+    items: [
+      { href: "/dashboard/sites", label: "Sites", icon: Store, pageKey: "sites" },
+      { href: "/dashboard/products", label: "Products", icon: Package, pageKey: "products" },
+    ],
+  },
+  {
+    title: "Marketing",
+    items: [
+      { href: "/dashboard/seo", label: "SEO", icon: Search, pageKey: "seo" },
+      { href: "/dashboard/ads", label: "Ads", icon: Megaphone, pageKey: "ads" },
+    ],
+  },
+  {
+    title: "Insights",
+    items: [
+      { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, pageKey: "analytics" },
+    ],
+  },
   {
     title: "Work",
     items: [
@@ -143,10 +168,10 @@ function SidebarContent({
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 border-b border-border p-4">
         <div className="bg-primary flex size-8 items-center justify-center rounded-lg">
-          <FolderKanban className="text-primary-foreground size-4" />
+          <Store className="text-primary-foreground size-4" />
         </div>
         <div className="flex flex-col">
-          <span className="text-sm font-semibold">Internal Tools</span>
+          <span className="text-sm font-semibold">Sapna Ops</span>
           <span className="text-xs text-muted-foreground">{user.role}</span>
         </div>
       </div>

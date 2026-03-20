@@ -10,7 +10,11 @@ import type { ChatCompletionTool, ChatCompletionMessageParam } from "openai/reso
 
 export const maxDuration = 60;
 
-const openai = new OpenAI();
+function getOpenAIClient(): OpenAI {
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
+  });
+}
 
 const SYSTEM_PROMPT = `You are a helpful AI assistant for an internal business tools dashboard. You have full access to the system's data through tools.
 
@@ -694,7 +698,7 @@ export async function POST(
           while (iterations < MAX_ITERATIONS) {
             iterations++;
 
-            const response = await openai.chat.completions.create({
+            const response = await getOpenAIClient().chat.completions.create({
               model: "gpt-4o-mini",
               messages,
               tools,
@@ -740,7 +744,7 @@ export async function POST(
               // Generate title for first message
               let newTitle: string | undefined;
               if (chat.messages.length === 0) {
-                const titleResponse = await openai.chat.completions.create({
+                const titleResponse = await getOpenAIClient().chat.completions.create({
                   model: "gpt-4o-mini",
                   messages: [
                     {

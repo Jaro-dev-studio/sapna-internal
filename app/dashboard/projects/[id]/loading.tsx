@@ -37,7 +37,7 @@ export default function ProjectDetailLoading() {
           <div className="rounded-lg border border-border bg-background p-6">
             <div className="mb-4 flex items-center justify-between">
               <Skeleton className="h-6 w-24" />
-              <Skeleton className="h-8 w-8 rounded" />
+              <Skeleton className="size-8 rounded" />
             </div>
             {[...Array(3)].map((_, i) => (
               <div

@@ -5,6 +5,11 @@ export const PERMISSION_RESOURCES = [
   { key: "calculations", label: "Calculations" },
   { key: "users", label: "Users" },
   { key: "notifications", label: "Notifications" },
+  { key: "sites", label: "Sites" },
+  { key: "seo", label: "SEO" },
+  { key: "ads", label: "Ads" },
+  { key: "products", label: "Products" },
+  { key: "analytics", label: "Analytics" },
 ] as const;
 
 export const PERMISSION_PAGES = [
@@ -16,6 +21,11 @@ export const PERMISSION_PAGES = [
   { key: "notifications", label: "Notifications", path: "/dashboard/notifications" },
   { key: "roles", label: "Roles", path: "/dashboard/roles" },
   { key: "profile", label: "Profile", path: "/dashboard/profile" },
+  { key: "sites", label: "Sites", path: "/dashboard/sites" },
+  { key: "seo", label: "SEO", path: "/dashboard/seo" },
+  { key: "ads", label: "Ads", path: "/dashboard/ads" },
+  { key: "products", label: "Products", path: "/dashboard/products" },
+  { key: "analytics", label: "Analytics", path: "/dashboard/analytics" },
 ] as const;
 
 export const PERMISSION_FEATURES = [
@@ -80,6 +90,11 @@ export const DEFAULT_MEMBER_PERMISSIONS: Permissions = {
     calculations: { create: true, read: true, update: true, delete: true },
     users: { create: false, read: false, update: false, delete: false },
     notifications: { create: false, read: false, update: false, delete: false },
+    sites: { create: false, read: true, update: false, delete: false },
+    seo: { create: false, read: true, update: false, delete: false },
+    ads: { create: false, read: true, update: false, delete: false },
+    products: { create: false, read: true, update: false, delete: false },
+    analytics: { create: false, read: true, update: false, delete: false },
   },
   pages: {
     projects: false,
@@ -90,6 +105,11 @@ export const DEFAULT_MEMBER_PERMISSIONS: Permissions = {
     notifications: false,
     roles: false,
     profile: true,
+    sites: true,
+    seo: true,
+    ads: true,
+    products: true,
+    analytics: true,
   },
   features: {
     aiChat: true,
@@ -104,6 +124,11 @@ export const DEFAULT_VIEWER_PERMISSIONS: Permissions = {
     calculations: { create: false, read: false, update: false, delete: false },
     users: { create: false, read: false, update: false, delete: false },
     notifications: { create: false, read: false, update: false, delete: false },
+    sites: { create: false, read: true, update: false, delete: false },
+    seo: { create: false, read: true, update: false, delete: false },
+    ads: { create: false, read: true, update: false, delete: false },
+    products: { create: false, read: true, update: false, delete: false },
+    analytics: { create: false, read: true, update: false, delete: false },
   },
   pages: {
     projects: false,
@@ -114,6 +139,11 @@ export const DEFAULT_VIEWER_PERMISSIONS: Permissions = {
     notifications: false,
     roles: false,
     profile: true,
+    sites: true,
+    seo: true,
+    ads: true,
+    products: true,
+    analytics: true,
   },
   features: {
     aiChat: false,

@@ -178,11 +178,11 @@ export function ProjectsClient({ projects: initialProjects }: ProjectsClientProp
         prev.map((p) =>
           p.id === editingProject.id
             ? {
-                ...p,
-                name: result.data!.name,
-                description: result.data!.description ?? null,
-                status: result.data!.status as ProjectStatus,
-              }
+              ...p,
+              name: result.data!.name,
+              description: result.data!.description ?? null,
+              status: result.data!.status as ProjectStatus,
+            }
             : p
         )
       );
@@ -274,11 +274,11 @@ export function ProjectsClient({ projects: initialProjects }: ProjectsClientProp
               <Link
                 key={project.id}
                 href={`/dashboard/projects/${project.id}`}
-                className="group block rounded-lg border border-border bg-background p-5 transition-colors hover:border-primary/30 hover:bg-accent/30"
+                className="hover:border-primary/30 group block rounded-lg border border-border bg-background p-5 transition-colors hover:bg-accent/30"
               >
                 <div className="mb-3 flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
+                    <div className="bg-primary/10 flex size-9 items-center justify-center rounded-lg">
                       <FolderKanban className="size-4.5 text-primary" />
                     </div>
                     <h3 className="font-semibold leading-tight">{project.name}</h3>

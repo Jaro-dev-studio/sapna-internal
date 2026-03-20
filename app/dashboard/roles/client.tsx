@@ -425,7 +425,7 @@ export function RolesClient({ roles: initialRoles }: RolesClientProps) {
       </div>
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Role</DialogTitle>
             <DialogDescription>
