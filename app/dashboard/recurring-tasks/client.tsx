@@ -414,7 +414,7 @@ export function RecurringTasksClient({
             <thead>
               <tr className="border-b border-border bg-background-secondary">
                 <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">Task</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">Project</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">Site</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">Schedule</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">Priority</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">Assignee</th>
@@ -654,7 +654,7 @@ export function RecurringTasksClient({
                 </SelectContent>
               </Select>
 
-              {/* Project */}
+              {/* Site */}
               <Select
                 value={formData.projectId}
                 onValueChange={(value) => setFormData({ ...formData, projectId: value })}
@@ -663,8 +663,8 @@ export function RecurringTasksClient({
                   <Building2 className="size-4 text-text-secondary" />
                   <span className="text-sm">
                     {formData.projectId
-                      ? purchasedProjects.find((c) => c.id === formData.projectId)?.name || "Project"
-                      : "Project"}
+                      ? purchasedProjects.find((c) => c.id === formData.projectId)?.name || "Site"
+                      : "Site"}
                   </span>
                 </SelectTrigger>
                 <SelectContent>

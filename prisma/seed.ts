@@ -141,6 +141,9 @@ async function main() {
   console.log(`[Seed] Admin user ready: ${adminEmail}`);
 
   console.log("[Seed] Resetting existing e-commerce seed dataset...");
+  await prisma.emailAutomationRun.deleteMany();
+  await prisma.emailAutomation.deleteMany();
+  await prisma.adPlatformConnection.deleteMany();
   await prisma.campaignMetrics.deleteMany();
   await prisma.creativeMetrics.deleteMany();
   await prisma.sEOKeyword.deleteMany();
@@ -164,6 +167,65 @@ async function main() {
         logoUrl: site.logoUrl,
         createdAt: site.createdAt,
         updatedAt: site.updatedAt,
+      },
+    });
+  }
+
+  console.log("[Seed] Syncing site-backed task projects...");
+  for (const site of mockSites) {
+    await prisma.project.upsert({
+      where: { id: site.id },
+      update: {
+        name: site.name,
+        description: site.description,
+        status: site.status === "ACTIVE" ? "ACTIVE" : "ARCHIVED",
+      },
+      create: {
+        id: site.id,
+        name: site.name,
+        description: site.description,
+        status: site.status === "ACTIVE" ? "ACTIVE" : "ARCHIVED",
+      },
+    });
+  }
+
+  console.log("[Seed] Seeding ad platform connections...");
+  for (const site of mockSites) {
+    await prisma.adPlatformConnection.upsert({
+      where: { siteId_platform: { siteId: site.id, platform: "META" } },
+      update: {
+        accountId: `meta_${site.id}`,
+        accountName: `${site.name} Meta Account`,
+        status: "CONNECTED",
+        lastSyncedAt: new Date(),
+      },
+      create: {
+        siteId: site.id,
+        platform: "META",
+        accountId: `meta_${site.id}`,
+        accountName: `${site.name} Meta Account`,
+        status: "CONNECTED",
+        lastSyncedAt: new Date(),
+      },
+    });
+  }
+
+  for (const site of mockSites.slice(0, 3)) {
+    await prisma.adPlatformConnection.upsert({
+      where: { siteId_platform: { siteId: site.id, platform: "GOOGLE" } },
+      update: {
+        accountId: `google_${site.id}`,
+        accountName: `${site.name} Google Ads`,
+        status: "CONNECTED",
+        lastSyncedAt: new Date(),
+      },
+      create: {
+        siteId: site.id,
+        platform: "GOOGLE",
+        accountId: `google_${site.id}`,
+        accountName: `${site.name} Google Ads`,
+        status: "CONNECTED",
+        lastSyncedAt: new Date(),
       },
     });
   }
@@ -351,6 +413,53 @@ async function main() {
       });
     }
   }
+
+  console.log("[Seed] Seeding email automations...");
+  const siteOneId = mockSites[0]?.id ?? null;
+  const siteTwoId = mockSites[1]?.id ?? null;
+
+  const abandonedCart = await prisma.emailAutomation.create({
+    data: {
+      name: "Abandoned cart recovery (2h)",
+      description: "First reminder two hours after cart abandonment.",
+      triggerType: "ABANDONED_CART",
+      siteId: siteOneId,
+      subjectTemplate: "You left something behind, {{email}}",
+      bodyTemplate:
+        "Complete your order today and enjoy a curated recommendation based on your cart.",
+      isActive: true,
+    },
+  });
+
+  const postPurchase = await prisma.emailAutomation.create({
+    data: {
+      name: "Post-purchase upsell (day 3)",
+      description: "Product recommendations after initial purchase.",
+      triggerType: "POST_PURCHASE",
+      siteId: siteTwoId,
+      subjectTemplate: "Recommended next purchase for {{email}}",
+      bodyTemplate:
+        "Thanks for your order. Here are complementary products customers often buy next.",
+      isActive: true,
+    },
+  });
+
+  await prisma.emailAutomationRun.createMany({
+    data: [
+      {
+        automationId: abandonedCart.id,
+        recipientEmail: "shopper.one@example.com",
+        status: "SENT",
+        sentAt: new Date(),
+      },
+      {
+        automationId: postPurchase.id,
+        recipientEmail: "shopper.two@example.com",
+        status: "SENT",
+        sentAt: new Date(),
+      },
+    ],
+  });
 
   console.log("[Seed] Done.");
 }

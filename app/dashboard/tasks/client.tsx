@@ -237,7 +237,7 @@ export function TasksClient({ tasks: initialTasks, projects, users, savedViews: 
     },
     {
       id: "project",
-      header: "Project",
+      header: "Site",
       accessorKey: "project.name",
       width: "w-40",
       sortable: true,
@@ -865,7 +865,7 @@ export function TasksClient({ tasks: initialTasks, projects, users, savedViews: 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-text-dark text-2xl font-bold">Tasks</h1>
-          <p className="text-text-secondary">Manage project tasks and assignments</p>
+          <p className="text-text-secondary">Manage site tasks and assignments</p>
         </div>
         <Button onClick={handleCreateTask}>
           <Plus className="mr-2 size-4" />
@@ -923,7 +923,7 @@ export function TasksClient({ tasks: initialTasks, projects, users, savedViews: 
             <div className="flex items-center gap-2">
               <Building2 className="size-4 text-text-secondary" />
               <span className="text-sm text-text-secondary">
-                {purchasedProjects.find((c) => c.id === formData.projectId)?.name || "Select project"}
+                {purchasedProjects.find((c) => c.id === formData.projectId)?.name || "Select site"}
               </span>
               <span className="text-text-secondary">&rsaquo;</span>
               <span className="text-sm font-medium">
@@ -1077,7 +1077,7 @@ export function TasksClient({ tasks: initialTasks, projects, users, savedViews: 
               </SelectContent>
             </Select>
 
-            {/* Project */}
+            {/* Site */}
             <Select
               value={formData.projectId}
               onValueChange={(value) => setFormData({ ...formData, projectId: value })}
@@ -1086,8 +1086,8 @@ export function TasksClient({ tasks: initialTasks, projects, users, savedViews: 
                 <Building2 className="size-4 text-text-secondary" />
                 <span className="text-sm">
                   {formData.projectId
-                    ? purchasedProjects.find((c) => c.id === formData.projectId)?.name || "Project"
-                    : "Project"}
+                    ? purchasedProjects.find((c) => c.id === formData.projectId)?.name || "Site"
+                    : "Site"}
                 </span>
               </SelectTrigger>
               <SelectContent>

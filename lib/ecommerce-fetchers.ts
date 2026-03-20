@@ -1137,3 +1137,210 @@ export async function getSiteAnalytics(siteId: string, days: number = 30): Promi
     return { data: null, error: "Failed to fetch site analytics" };
   }
 }
+
+export async function getCreative(id: string): Promise<{
+  data: Creative | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Ads] Fetching creative from database:", id);
+
+    const creative = await prisma.creative.findUnique({
+      where: { id },
+      include: {
+        site: { select: { id: true, name: true } },
+        campaign: { select: { id: true, name: true } },
+        metrics: true,
+      },
+    });
+
+    if (!creative) {
+      return { data: null, error: "Creative not found" };
+    }
+
+    return { data: mapCreative(creative), error: null };
+  } catch (error) {
+    console.error("Error fetching creative:", error);
+    return { data: null, error: "Failed to fetch creative" };
+  }
+}
+
+export interface AdPlatformConnectionData {
+  id: string;
+  siteId: string;
+  site: { id: string; name: string };
+  platform: "META" | "GOOGLE" | "TIKTOK" | "PINTEREST";
+  status: "CONNECTED" | "DISCONNECTED" | "ERROR";
+  accountId: string | null;
+  accountName: string | null;
+  lastSyncedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export async function getAdPlatformConnections(): Promise<{
+  data: AdPlatformConnectionData[] | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Ads Connections] Fetching platform connections...");
+
+    const connections = await prisma.adPlatformConnection.findMany({
+      include: {
+        site: { select: { id: true, name: true } },
+      },
+      orderBy: [{ platform: "asc" }, { site: { name: "asc" } }],
+    });
+
+    return {
+      data: connections.map((connection) => ({
+        id: connection.id,
+        siteId: connection.siteId,
+        site: connection.site,
+        platform: connection.platform,
+        status: connection.status,
+        accountId: connection.accountId,
+        accountName: connection.accountName,
+        lastSyncedAt: connection.lastSyncedAt,
+        createdAt: connection.createdAt,
+        updatedAt: connection.updatedAt,
+      })),
+      error: null,
+    };
+  } catch (error) {
+    console.error("Error fetching ad platform connections:", error);
+    return { data: null, error: "Failed to fetch ad platform connections" };
+  }
+}
+
+export interface EmailAutomationData {
+  id: string;
+  name: string;
+  description: string | null;
+  triggerType:
+    | "ABANDONED_CART"
+    | "POST_PURCHASE"
+    | "PRODUCT_BACK_IN_STOCK"
+    | "WINBACK"
+    | "MANUAL";
+  isActive: boolean;
+  subjectTemplate: string;
+  bodyTemplate: string;
+  siteId: string | null;
+  site: { id: string; name: string } | null;
+  runsCount: number;
+  lastRunAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface EmailAutomationDetailData extends EmailAutomationData {
+  runs: Array<{
+    id: string;
+    recipientEmail: string;
+    status: "PENDING" | "SENT" | "FAILED";
+    errorMessage: string | null;
+    sentAt: Date | null;
+    createdAt: Date;
+  }>;
+}
+
+export async function getEmailAutomations(): Promise<{
+  data: EmailAutomationData[] | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Email Automation] Fetching automations...");
+
+    const automations = await prisma.emailAutomation.findMany({
+      include: {
+        site: { select: { id: true, name: true } },
+        runs: {
+          select: { sentAt: true, createdAt: true },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+        _count: { select: { runs: true } },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    return {
+      data: automations.map((automation) => ({
+        id: automation.id,
+        name: automation.name,
+        description: automation.description,
+        triggerType: automation.triggerType,
+        isActive: automation.isActive,
+        subjectTemplate: automation.subjectTemplate,
+        bodyTemplate: automation.bodyTemplate,
+        siteId: automation.siteId,
+        site: automation.site,
+        runsCount: automation._count.runs,
+        lastRunAt: automation.runs[0]?.sentAt ?? automation.runs[0]?.createdAt ?? null,
+        createdAt: automation.createdAt,
+        updatedAt: automation.updatedAt,
+      })),
+      error: null,
+    };
+  } catch (error) {
+    console.error("Error fetching email automations:", error);
+    return { data: null, error: "Failed to fetch email automations" };
+  }
+}
+
+export async function getEmailAutomation(id: string): Promise<{
+  data: EmailAutomationDetailData | null;
+  error: string | null;
+}> {
+  try {
+    console.log("[Email Automation] Fetching automation details:", id);
+
+    const automation = await prisma.emailAutomation.findUnique({
+      where: { id },
+      include: {
+        site: { select: { id: true, name: true } },
+        runs: {
+          select: {
+            id: true,
+            recipientEmail: true,
+            status: true,
+            errorMessage: true,
+            sentAt: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 25,
+        },
+        _count: { select: { runs: true } },
+      },
+    });
+
+    if (!automation) {
+      return { data: null, error: "Email automation not found" };
+    }
+
+    return {
+      data: {
+        id: automation.id,
+        name: automation.name,
+        description: automation.description,
+        triggerType: automation.triggerType,
+        isActive: automation.isActive,
+        subjectTemplate: automation.subjectTemplate,
+        bodyTemplate: automation.bodyTemplate,
+        siteId: automation.siteId,
+        site: automation.site,
+        runsCount: automation._count.runs,
+        lastRunAt: automation.runs[0]?.sentAt ?? automation.runs[0]?.createdAt ?? null,
+        createdAt: automation.createdAt,
+        updatedAt: automation.updatedAt,
+        runs: automation.runs,
+      },
+      error: null,
+    };
+  } catch (error) {
+    console.error("Error fetching email automation:", error);
+    return { data: null, error: "Failed to fetch email automation" };
+  }
+}

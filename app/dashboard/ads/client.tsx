@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useState, useTransition } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Megaphone,
   DollarSign,
   Eye,
-  MousePointer,
   TrendingUp,
   Plus,
   Image,
@@ -19,13 +22,24 @@ import {
   ArrowRight,
   Play,
   Pause,
-  FileEdit,
+  Link2,
+  RefreshCcw,
 } from "lucide-react";
-import type { Campaign, Creative } from "@/lib/mock-data/types";
+import {
+  connectAdPlatform,
+  createAdCampaign,
+  createAdCreative,
+  disconnectAdPlatform,
+  syncAdPlatformConnection,
+} from "@/lib/actions";
+import type { Campaign, Creative, Site } from "@/lib/mock-data/types";
+import type { AdPlatformConnectionData } from "@/lib/ecommerce-fetchers";
 
 interface AdsClientProps {
   campaigns: Campaign[];
   creatives: Creative[];
+  sites: Site[];
+  connections: AdPlatformConnectionData[];
   summary: {
     totalCampaigns: number;
     activeCampaigns: number;
@@ -73,22 +87,6 @@ function getStatusColor(status: Campaign["status"] | Creative["status"]): string
   }
 }
 
-function getPlatformIcon(platform: Campaign["platform"]): React.ReactNode {
-  const className = "size-4";
-  switch (platform) {
-    case "META":
-      return <span className={className}>Meta</span>;
-    case "GOOGLE":
-      return <span className={className}>Google</span>;
-    case "TIKTOK":
-      return <span className={className}>TikTok</span>;
-    case "PINTEREST":
-      return <span className={className}>Pinterest</span>;
-    default:
-      return null;
-  }
-}
-
 function getCreativeTypeIcon(type: Creative["type"]): React.ReactNode {
   switch (type) {
     case "IMAGE":
@@ -104,8 +102,121 @@ function getCreativeTypeIcon(type: Creative["type"]): React.ReactNode {
   }
 }
 
-export function AdsClient({ campaigns, creatives, summary }: AdsClientProps) {
+function getConnectionStatusColor(status: AdPlatformConnectionData["status"]): string {
+  if (status === "CONNECTED") return "bg-green-500/10 text-green-600 border-green-500/20";
+  if (status === "ERROR") return "bg-red-500/10 text-red-600 border-red-500/20";
+  return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
+}
+
+export function AdsClient({ campaigns, creatives, sites, connections, summary }: AdsClientProps) {
   const [tab, setTab] = useState("campaigns");
+  const [isPending, startTransition] = useTransition();
+  const [message, setMessage] = useState<string | null>(null);
+  const [connectionForm, setConnectionForm] = useState({
+    siteId: sites[0]?.id ?? "",
+    platform: "META" as "META" | "GOOGLE",
+    accountId: "",
+    accountName: "",
+  });
+  const [campaignForm, setCampaignForm] = useState({
+    name: "",
+    siteId: sites[0]?.id ?? "",
+    platform: "META" as Campaign["platform"],
+    objective: "",
+    budget: "0",
+    dailyBudget: "0",
+  });
+  const [creativeForm, setCreativeForm] = useState({
+    name: "",
+    type: "IMAGE" as Creative["type"],
+    siteId: sites[0]?.id ?? "",
+    campaignId: "none",
+    headline: "",
+    callToAction: "",
+  });
+
+  async function handleCreateCampaign(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage(null);
+
+    startTransition(async () => {
+      const result = await createAdCampaign({
+        name: campaignForm.name,
+        siteId: campaignForm.siteId,
+        platform: campaignForm.platform,
+        objective: campaignForm.objective || undefined,
+        budget: Number(campaignForm.budget) || 0,
+        dailyBudget: Number(campaignForm.dailyBudget) || 0,
+      });
+
+      if (result.error) {
+        setMessage(result.error);
+        return;
+      }
+
+      setCampaignForm((current) => ({
+        ...current,
+        name: "",
+        objective: "",
+      }));
+      setMessage("Campaign created.");
+    });
+  }
+
+  async function handleCreateCreative(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage(null);
+
+    startTransition(async () => {
+      const result = await createAdCreative({
+        name: creativeForm.name,
+        type: creativeForm.type,
+        siteId: creativeForm.siteId,
+        campaignId: creativeForm.campaignId === "none" ? undefined : creativeForm.campaignId,
+        headline: creativeForm.headline || undefined,
+        callToAction: creativeForm.callToAction || undefined,
+      });
+
+      if (result.error) {
+        setMessage(result.error);
+        return;
+      }
+
+      setCreativeForm((current) => ({
+        ...current,
+        name: "",
+        headline: "",
+        callToAction: "",
+      }));
+      setMessage("Creative created.");
+    });
+  }
+
+  async function handleConnectPlatform(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage(null);
+
+    startTransition(async () => {
+      const result = await connectAdPlatform({
+        siteId: connectionForm.siteId,
+        platform: connectionForm.platform,
+        accountId: connectionForm.accountId,
+        accountName: connectionForm.accountName,
+      });
+
+      if (result.error) {
+        setMessage(result.error);
+        return;
+      }
+
+      setConnectionForm((current) => ({
+        ...current,
+        accountId: "",
+        accountName: "",
+      }));
+      setMessage("Platform connected.");
+    });
+  }
 
   return (
     <div className="space-y-8">
@@ -116,11 +227,17 @@ export function AdsClient({ campaigns, creatives, summary }: AdsClientProps) {
             Manage campaigns and creatives across all platforms
           </p>
         </div>
-        <Button disabled>
+        <Button onClick={() => setTab("campaigns")}>
           <Plus className="mr-2 size-4" />
           Create Campaign
         </Button>
       </div>
+
+      {message ? (
+        <div className="rounded border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+          {message}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -178,6 +295,10 @@ export function AdsClient({ campaigns, creatives, summary }: AdsClientProps) {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
+          <TabsTrigger value="integrations">
+            <Link2 className="mr-2 size-4" />
+            Integrations ({connections.length})
+          </TabsTrigger>
           <TabsTrigger value="campaigns">
             <Megaphone className="mr-2 size-4" />
             Campaigns ({campaigns.length})
@@ -188,7 +309,236 @@ export function AdsClient({ campaigns, creatives, summary }: AdsClientProps) {
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="integrations" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Connected ad platforms</CardTitle>
+              <CardDescription>
+                Connect and manage Google Ads / Meta account links per site.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {connections.map((connection) => (
+                <div
+                  key={connection.id}
+                  className="flex items-center justify-between rounded border border-border p-3"
+                >
+                  <div>
+                    <p className="font-medium">
+                      {connection.site.name} - {connection.platform}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {connection.accountName || "No account name"} ({connection.accountId || "N/A"})
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className={getConnectionStatusColor(connection.status)}>
+                      {connection.status}
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isPending}
+                      onClick={() =>
+                        startTransition(async () => {
+                          const result = await syncAdPlatformConnection(connection.id);
+                          setMessage(result.error ?? "Connection synced.");
+                        })
+                      }
+                    >
+                      <RefreshCcw className="mr-1 size-3" />
+                      Sync
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={isPending}
+                      onClick={() =>
+                        startTransition(async () => {
+                          const result = await disconnectAdPlatform(connection.id);
+                          setMessage(result.error ?? "Connection disconnected.");
+                        })
+                      }
+                    >
+                      Disconnect
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Connect new platform</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form className="grid gap-3 md:grid-cols-2" onSubmit={handleConnectPlatform}>
+                <div className="space-y-1">
+                  <Label>Site</Label>
+                  <Select
+                    value={connectionForm.siteId}
+                    onValueChange={(value) => setConnectionForm((current) => ({ ...current, siteId: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sites.map((site) => (
+                        <SelectItem key={site.id} value={site.id}>
+                          {site.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Platform</Label>
+                  <Select
+                    value={connectionForm.platform}
+                    onValueChange={(value) =>
+                      setConnectionForm((current) => ({
+                        ...current,
+                        platform: value as "META" | "GOOGLE",
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="META">Meta</SelectItem>
+                      <SelectItem value="GOOGLE">Google Ads</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Account ID</Label>
+                  <Input
+                    required
+                    value={connectionForm.accountId}
+                    onChange={(event) =>
+                      setConnectionForm((current) => ({ ...current, accountId: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Account Name</Label>
+                  <Input
+                    required
+                    value={connectionForm.accountName}
+                    onChange={(event) =>
+                      setConnectionForm((current) => ({ ...current, accountName: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Button type="submit" disabled={isPending}>
+                    Connect Platform
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="campaigns" className="mt-6">
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle>Create campaign</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form className="grid gap-3 md:grid-cols-3" onSubmit={handleCreateCampaign}>
+                <div className="space-y-1 md:col-span-3">
+                  <Label>Campaign name</Label>
+                  <Input
+                    required
+                    value={campaignForm.name}
+                    onChange={(event) =>
+                      setCampaignForm((current) => ({ ...current, name: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Site</Label>
+                  <Select
+                    value={campaignForm.siteId}
+                    onValueChange={(value) => setCampaignForm((current) => ({ ...current, siteId: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sites.map((site) => (
+                        <SelectItem key={site.id} value={site.id}>
+                          {site.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Platform</Label>
+                  <Select
+                    value={campaignForm.platform}
+                    onValueChange={(value) =>
+                      setCampaignForm((current) => ({
+                        ...current,
+                        platform: value as Campaign["platform"],
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="META">Meta</SelectItem>
+                      <SelectItem value="GOOGLE">Google</SelectItem>
+                      <SelectItem value="TIKTOK">TikTok</SelectItem>
+                      <SelectItem value="PINTEREST">Pinterest</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Objective</Label>
+                  <Input
+                    value={campaignForm.objective}
+                    onChange={(event) =>
+                      setCampaignForm((current) => ({ ...current, objective: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Budget</Label>
+                  <Input
+                    type="number"
+                    value={campaignForm.budget}
+                    onChange={(event) =>
+                      setCampaignForm((current) => ({ ...current, budget: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Daily budget</Label>
+                  <Input
+                    type="number"
+                    value={campaignForm.dailyBudget}
+                    onChange={(event) =>
+                      setCampaignForm((current) => ({ ...current, dailyBudget: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button type="submit" disabled={isPending}>
+                    Create
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-4">
             {campaigns.map((campaign) => (
               <Card key={campaign.id}>
@@ -242,13 +592,12 @@ export function AdsClient({ campaigns, creatives, summary }: AdsClientProps) {
                         <Play className="size-4" />
                       )}
                     </Button>
-                    <Button variant="ghost" size="icon" disabled>
-                      <FileEdit className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm">
-                      View
-                      <ArrowRight className="ml-1 size-3" />
-                    </Button>
+                    <Link href={`/dashboard/ads/campaigns/${campaign.id}`}>
+                      <Button variant="ghost" size="sm">
+                        View
+                        <ArrowRight className="ml-1 size-3" />
+                      </Button>
+                    </Link>
                   </div>
                 </CardContent>
               </Card>
@@ -257,6 +606,110 @@ export function AdsClient({ campaigns, creatives, summary }: AdsClientProps) {
         </TabsContent>
 
         <TabsContent value="creatives" className="mt-6">
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle>Create creative</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form className="grid gap-3 md:grid-cols-3" onSubmit={handleCreateCreative}>
+                <div className="space-y-1 md:col-span-3">
+                  <Label>Creative name</Label>
+                  <Input
+                    required
+                    value={creativeForm.name}
+                    onChange={(event) =>
+                      setCreativeForm((current) => ({ ...current, name: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Type</Label>
+                  <Select
+                    value={creativeForm.type}
+                    onValueChange={(value) =>
+                      setCreativeForm((current) => ({ ...current, type: value as Creative["type"] }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="IMAGE">Image</SelectItem>
+                      <SelectItem value="VIDEO">Video</SelectItem>
+                      <SelectItem value="CAROUSEL">Carousel</SelectItem>
+                      <SelectItem value="UGC">UGC</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Site</Label>
+                  <Select
+                    value={creativeForm.siteId}
+                    onValueChange={(value) => setCreativeForm((current) => ({ ...current, siteId: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sites.map((site) => (
+                        <SelectItem key={site.id} value={site.id}>
+                          {site.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Campaign</Label>
+                  <Select
+                    value={creativeForm.campaignId}
+                    onValueChange={(value) =>
+                      setCreativeForm((current) => ({ ...current, campaignId: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No campaign</SelectItem>
+                      {campaigns.map((campaign) => (
+                        <SelectItem key={campaign.id} value={campaign.id}>
+                          {campaign.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Headline</Label>
+                  <Input
+                    value={creativeForm.headline}
+                    onChange={(event) =>
+                      setCreativeForm((current) => ({ ...current, headline: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Call to action</Label>
+                  <Input
+                    value={creativeForm.callToAction}
+                    onChange={(event) =>
+                      setCreativeForm((current) => ({
+                        ...current,
+                        callToAction: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button type="submit" disabled={isPending}>
+                    Create
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {creatives.map((creative) => (
               <Card key={creative.id}>
@@ -308,6 +761,15 @@ export function AdsClient({ campaigns, creatives, summary }: AdsClientProps) {
                       Campaign: {creative.campaign.name}
                     </div>
                   )}
+
+                  <div className="flex justify-end border-t pt-3">
+                    <Link href={`/dashboard/ads/creatives/${creative.id}`}>
+                      <Button size="sm" variant="ghost">
+                        View Details
+                        <ArrowRight className="ml-1 size-3" />
+                      </Button>
+                    </Link>
+                  </div>
                 </CardContent>
               </Card>
             ))}

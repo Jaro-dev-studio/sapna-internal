@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
         }
         const result = await prisma.task.deleteMany({ where: { id: { in: ids } } });
         revalidatePath("/dashboard/tasks");
-        revalidatePath("/dashboard/projects");
+        revalidatePath("/dashboard/sites");
         return NextResponse.json({ success: true, deletedCount: result.count });
       }
 
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
         }
         const result = await prisma.project.deleteMany({ where: { id: { in: ids } } });
         revalidatePath("/dashboard/tasks");
-        revalidatePath("/dashboard/projects");
+        revalidatePath("/dashboard/sites");
         return NextResponse.json({ success: true, deletedCount: result.count });
       }
 

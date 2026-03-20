@@ -352,6 +352,8 @@ model Site {
   seoAnalyses     SEOAnalysis[]
   productListings ProductListing[]
   analyticsData   AnalyticsSnapshot[]
+  adConnections   AdPlatformConnection[]
+  emailAutomations EmailAutomation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -627,4 +629,98 @@ model AnalyticsSnapshot {
   @@unique([siteId, date])
   @@index([siteId])
   @@index([date])
+}
+
+// ============================================
+// ADS PLATFORM CONNECTIONS
+// ============================================
+
+model AdPlatformConnection {
+  id String @id @default(cuid())
+
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  platform AdPlatform
+  status   AdConnectionStatus @default(DISCONNECTED)
+
+  accountId   String?
+  accountName String?
+
+  accessToken  String?
+  refreshToken String?
+
+  lastSyncedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([siteId, platform])
+  @@index([siteId])
+  @@index([platform])
+}
+
+enum AdConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+}
+
+// ============================================
+// EMAIL AUTOMATION
+// ============================================
+
+model EmailAutomation {
+  id String @id @default(cuid())
+
+  name        String
+  description String?
+  triggerType EmailAutomationTriggerType
+  isActive    Boolean @default(true)
+
+  subjectTemplate String
+  bodyTemplate    String @db.Text
+
+  siteId String?
+  site   Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  runs EmailAutomationRun[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([siteId])
+  @@index([isActive])
+}
+
+enum EmailAutomationTriggerType {
+  ABANDONED_CART
+  POST_PURCHASE
+  PRODUCT_BACK_IN_STOCK
+  WINBACK
+  MANUAL
+}
+
+model EmailAutomationRun {
+  id String @id @default(cuid())
+
+  automationId String
+  automation   EmailAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  recipientEmail String
+  status         EmailAutomationRunStatus @default(PENDING)
+  errorMessage   String?                  @db.Text
+
+  sentAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([automationId])
+  @@index([recipientEmail])
+  @@index([status])
+}
+
+enum EmailAutomationRunStatus {
+  PENDING
+  SENT
+  FAILED
 }

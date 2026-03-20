@@ -12,15 +12,14 @@ import {
   UserCircle,
   Bell,
   Repeat,
-  LayoutDashboard,
   Calculator,
-  FolderKanban,
   Shield,
   Store,
   Search,
   Megaphone,
   Package,
   BarChart3,
+  Mail,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -65,6 +64,7 @@ const allNavigationSections: NavSection[] = [
     items: [
       { href: "/dashboard/seo", label: "SEO", icon: Search, pageKey: "seo" },
       { href: "/dashboard/ads", label: "Ads", icon: Megaphone, pageKey: "ads" },
+      { href: "/dashboard/email-automation", label: "Email Automation", icon: Mail, pageKey: "emailAutomation" },
     ],
   },
   {
@@ -76,7 +76,6 @@ const allNavigationSections: NavSection[] = [
   {
     title: "Work",
     items: [
-      { href: "/dashboard/projects", label: "Projects", icon: FolderKanban, pageKey: "projects" },
       { href: "/dashboard/tasks", label: "Tasks", icon: ListTodo, pageKey: "tasks" },
       { href: "/dashboard/recurring-tasks", label: "Recurring Tasks", icon: Repeat, pageKey: "recurringTasks" },
     ],

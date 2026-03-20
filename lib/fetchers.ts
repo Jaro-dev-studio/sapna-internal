@@ -4,14 +4,18 @@ import prisma from "@/lib/prisma";
 import { getUserPermissions } from "@/lib/permissions";
 import type { Permissions } from "@/config/permissions";
 import {
+  getAdPlatformConnections as getAdPlatformConnectionsFromDb,
   getAdsDashboardData as getAdsDashboardDataFromDb,
   getAnalyticsDashboardData as getAnalyticsDashboardDataFromDb,
   getCampaign as getCampaignFromDb,
   getCampaigns as getCampaignsFromDb,
   getCampaignsForSite as getCampaignsForSiteFromDb,
+  getCreative as getCreativeFromDb,
   getCreatives as getCreativesFromDb,
   getCreativesForCampaign as getCreativesForCampaignFromDb,
   getCreativesForSite as getCreativesForSiteFromDb,
+  getEmailAutomation as getEmailAutomationFromDb,
+  getEmailAutomations as getEmailAutomationsFromDb,
   getProductListing as getProductListingFromDb,
   getProductListings as getProductListingsFromDb,
   getProductsDashboardData as getProductsDashboardDataFromDb,
@@ -31,7 +35,9 @@ import {
 
 export async function getProjects() {
   try {
-    const projects = await prisma.project.findMany({
+    // Sites are the canonical workspaces; expose them through the
+    // existing "projects" fetcher contract for task/user flows.
+    const sites = await prisma.site.findMany({
       select: {
         id: true,
         name: true,
@@ -39,14 +45,32 @@ export async function getProjects() {
         status: true,
         createdAt: true,
         updatedAt: true,
-        _count: {
-          select: {
-            tasks: true,
-            members: true,
-          },
-        },
       },
       orderBy: { createdAt: "desc" },
+    });
+
+    const taskCounts = await prisma.task.groupBy({
+      by: ["projectId"],
+      _count: { _all: true },
+      where: {
+        projectId: { in: sites.map((site) => site.id) },
+      },
+    });
+
+    const taskCountMap = new Map(taskCounts.map((row) => [row.projectId, row._count._all]));
+
+    const projects = sites.map((site) => {
+      const normalizedStatus: "ACTIVE" | "ARCHIVED" =
+        site.status === "ACTIVE" ? "ACTIVE" : "ARCHIVED";
+
+      return {
+        ...site,
+        status: normalizedStatus,
+        _count: {
+          tasks: taskCountMap.get(site.id) ?? 0,
+          members: 0,
+        },
+      };
     });
 
     return { data: projects, error: null };
@@ -58,35 +82,38 @@ export async function getProjects() {
 
 export async function getProject(id: string) {
   try {
-    const project = await prisma.project.findUnique({
+    const site = await prisma.site.findUnique({
       where: { id },
-      include: {
-        members: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                role: true,
-              },
-            },
-          },
-        },
-        _count: {
-          select: {
-            tasks: true,
-          },
-        },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
-    if (!project) {
+    if (!site) {
       return { data: null, error: "Project not found" };
     }
 
-    return { data: project, error: null };
+    const taskCount = await prisma.task.count({
+      where: { projectId: id },
+    });
+
+    const normalizedStatus: "ACTIVE" | "ARCHIVED" =
+      site.status === "ACTIVE" ? "ACTIVE" : "ARCHIVED";
+
+    return {
+      data: {
+        ...site,
+        status: normalizedStatus,
+        members: [],
+        _count: { tasks: taskCount },
+      },
+      error: null,
+    };
   } catch (error) {
     console.error("Error fetching project:", error);
     return { data: null, error: "Failed to fetch project" };
@@ -427,8 +454,16 @@ export async function getCreativesForCampaign(campaignId: string) {
   return getCreativesForCampaignFromDb(campaignId);
 }
 
+export async function getCreative(id: string) {
+  return getCreativeFromDb(id);
+}
+
 export async function getAdsDashboardData() {
   return getAdsDashboardDataFromDb();
+}
+
+export async function getAdPlatformConnections() {
+  return getAdPlatformConnectionsFromDb();
 }
 
 export async function getSEOAnalyses() {
@@ -465,4 +500,12 @@ export async function getAnalyticsDashboardData(days: number = 30) {
 
 export async function getSiteAnalytics(siteId: string, days: number = 30) {
   return getSiteAnalyticsFromDb(siteId, days);
+}
+
+export async function getEmailAutomations() {
+  return getEmailAutomationsFromDb();
+}
+
+export async function getEmailAutomation(id: string) {
+  return getEmailAutomationFromDb(id);
 }
