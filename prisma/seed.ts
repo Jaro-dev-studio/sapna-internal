@@ -12,7 +12,8 @@ import { mockProducts } from "../lib/mock-data/products";
 import { getAllAnalyticsSnapshots } from "../lib/mock-data/analytics";
 
 const prisma = new PrismaClient();
-const DEFAULT_ADMIN_EMAIL = "admin@internal-tools.local";
+const DEFAULT_ADMIN_EMAIL = "jaroslav.vorobey@gmail.com";
+const LEGACY_ADMIN_EMAILS = ["admin@internal-tools.local"];
 const DEFAULT_ADMIN_PASSWORD = "asdfghjklkjhgfdsa";
 
 function normalizeSnapshotDate(date: Date): Date {
@@ -86,6 +87,38 @@ async function main() {
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? DEFAULT_ADMIN_EMAIL;
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? DEFAULT_ADMIN_PASSWORD;
   const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
+
+  for (const legacyEmail of LEGACY_ADMIN_EMAILS) {
+    if (legacyEmail === adminEmail) {
+      continue;
+    }
+
+    const legacyAdmin = await prisma.user.findUnique({
+      where: { email: legacyEmail },
+      select: { id: true },
+    });
+
+    if (!legacyAdmin) {
+      continue;
+    }
+
+    const targetAdmin = await prisma.user.findUnique({
+      where: { email: adminEmail },
+      select: { id: true },
+    });
+
+    if (targetAdmin) {
+      await prisma.user.delete({ where: { id: legacyAdmin.id } });
+      console.log(`[Seed] Removed legacy admin user: ${legacyEmail}`);
+      continue;
+    }
+
+    await prisma.user.update({
+      where: { id: legacyAdmin.id },
+      data: { email: adminEmail },
+    });
+    console.log(`[Seed] Migrated admin email ${legacyEmail} -> ${adminEmail}`);
+  }
 
   await prisma.user.upsert({
     where: { email: adminEmail },
