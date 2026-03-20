@@ -1,14 +1,12 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DollarSign,
   ShoppingCart,
   Users,
   TrendingUp,
-  TrendingDown,
   ArrowUpRight,
   ArrowDownRight,
   Download,
@@ -55,6 +53,13 @@ function ChangeIndicator({ value }: { value: number }) {
 }
 
 export function AnalyticsClient({ data }: AnalyticsClientProps) {
+  const recentDailyData = data.dailyData.slice(-30);
+  const maxDailyRevenue = recentDailyData.reduce(
+    (maxRevenue, day) => Math.max(maxRevenue, day.revenue),
+    0
+  );
+  const hasRevenueChartData = recentDailyData.length > 0 && maxDailyRevenue > 0;
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -141,20 +146,32 @@ export function AnalyticsClient({ data }: AnalyticsClientProps) {
             <CardDescription>Daily revenue over the last 30 days</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex h-[300px] items-end gap-1">
-              {data.dailyData.slice(-30).map((day, index) => {
-                const maxRevenue = Math.max(...data.dailyData.map(d => d.revenue));
-                const height = (day.revenue / maxRevenue) * 100;
-                return (
-                  <div
-                    key={day.date}
-                    className="bg-primary/80 hover:bg-primary flex-1 rounded-t transition-colors"
-                    style={{ height: `${height}%` }}
-                    title={`${day.date}: ${formatCurrency(day.revenue)}`}
-                  />
-                );
-              })}
-            </div>
+            {hasRevenueChartData ? (
+              <div className="flex h-[300px] items-end gap-1" aria-label="Revenue chart bars">
+                {recentDailyData.map((day) => {
+                  const heightPercent = Math.max((day.revenue / maxDailyRevenue) * 100, 2);
+
+                  return (
+                    <div
+                      key={day.date}
+                      className="flex-1 rounded-t transition-opacity hover:opacity-80"
+                      style={{
+                        height: `${heightPercent}%`,
+                        minWidth: "4px",
+                        backgroundColor: "hsl(var(--primary))",
+                      }}
+                      title={`${day.date}: ${formatCurrency(day.revenue)}`}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex h-[300px] items-center justify-center rounded-lg border border-dashed">
+                <p className="text-sm text-muted-foreground">
+                  No revenue data available for this period.
+                </p>
+              </div>
+            )}
             <div className="mt-4 flex justify-between text-xs text-muted-foreground">
               <span>{data.dailyData[0]?.date}</span>
               <span>{data.dailyData[data.dailyData.length - 1]?.date}</span>
