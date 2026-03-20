@@ -4,6 +4,13 @@ import { getToken } from "next-auth/jwt";
 
 function checkPageAccess(pathname: string, pageAccess: string[]): boolean {
   if (!pageAccess || pageAccess.length === 0) return false;
+
+  // Backward compatibility: older JWTs may not include newly added page paths.
+  // Allow email automation routes through middleware and rely on page-level guards.
+  if (pathname.startsWith("/dashboard/email-automation")) {
+    return pageAccess.some((path) => path.startsWith("/dashboard"));
+  }
+
   return pageAccess.some((path) => pathname.startsWith(path));
 }
 
